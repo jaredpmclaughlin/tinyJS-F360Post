@@ -39,20 +39,12 @@
 #include <stdio.h>
 
 
-//const char *code = "var a = 5; if (a==5) a=4; else a=3;";
-//const char *code = "{ var a = 4; var b = 1; while (a>0) { b = b * 2; a = a - 1; } var c = 5; }";
-//const char *code = "{ var b = 1; for (var i=0;i<4;i=i+1) b = b * 2; }";
 const char *code = "function myfunc(x, y) { return x + y; } var a = myfunc(1,2); print(a);";
+const size_t readBufSz = 2048;
 
-void js_print(CScriptVar *v, void *userdata) {
-    printf("> %s\n", v->getParameter("text")->getString().c_str());
-}
-
-void js_dump(CScriptVar *v, void *userdata) {
-    CTinyJS *js = (CTinyJS*)userdata;
-    js->root->trace(">  ");
-}
-
+void js_print(CScriptVar *v, void *userdata);
+void js_dump(CScriptVar *v, void *userdata);
+void eval_script(char *filename);
 
 int main(int argc, char **argv)
 {
@@ -77,6 +69,8 @@ int main(int argc, char **argv)
     printf("ERROR: %s\n", e->text.c_str());
   }
 
+  eval_script("test_data/rs274.cps");
+
   /* Execute out bit of code - we could call 'evaluate' here if
      we wanted something returned */
   try {
@@ -86,9 +80,10 @@ int main(int argc, char **argv)
     printf("ERROR: %s\n", e->text.c_str());
   }
 
+  /* REPL */
   while (js->evaluate("lets_quit") == "0") {
-    char buffer[2048];
-    fgets ( buffer, sizeof(buffer), stdin );
+    char buffer[readBufSz];
+    fgets ( buffer, readBufSz, stdin );
     try {
       js->execute(buffer);
     } catch (CScriptException *e) {
@@ -103,4 +98,124 @@ int main(int argc, char **argv)
 #endif
 #endif
   return 0;
+}
+
+
+void js_print(CScriptVar *v, void *userdata) {
+    printf("> %s\n", v->getParameter("text")->getString().c_str());
+}
+
+void js_dump(CScriptVar *v, void *userdata) {
+    CTinyJS *js = (CTinyJS*)userdata;
+    js->root->trace(">  ");
+}
+
+struct block_s {
+    size_t capacity=0;
+    size_t size=0;
+    char* data=NULL; 
+};
+
+void block_append(struct block_s* block, char* string){
+    if(block==NULL || string==NULL) return;
+
+    size_t length = strlen(string);
+    while(block->capacity < (block->size+length)) 
+        block->capacity+=block->capacity;
+
+    realloc(block->data, block->capacity);
+    memcpy(&(block->data[block->size-1]),string,length+1);
+    block->size+=length+1;
+}
+
+void block_clear(struct block_s* block) {
+    block->size=0;
+    block->data[0]='\0';
+}
+
+void eval_script(char* filename) {
+
+  FILE *script = fopen(filename,"r");
+  if(script==NULL) 
+    throw new CScriptException(strerror(errno));
+
+  CTinyJS *js = new CTinyJS();
+
+  size_t blockSz=readBufSz*2;
+  char buffer[readBufSz];
+  struct block_s block;
+
+  const std::string block_comment_start_string("/**");
+  const std::string block_comment_end_string("*/");
+  const std::string block_start_string("{");
+  const std::string block_end_string("}");
+
+  bool block_comment{false};
+  bool inblock{false};
+
+  char* comment_start=NULL;
+
+  size_t braces{0};
+
+  size_t line=0;
+  char err_str[50];
+
+  try {
+    // fgets == NULL on eof with 0 chars read, or error
+    while(fgets(buffer,readBufSz,script)!=NULL) { 
+    /* js->execute has trouble with comments and newlines
+     *  that occur within some blocks, so we strip them out
+     */
+        line++;
+        if( strlen(buffer)==(readBufSz-1) && buffer[readBufSz-1]!='\0' ) {
+            sprintf(err_str, "Script line %u exceeds buffer length.");
+            throw new CScriptException(err_str);
+        }
+
+        if((comment_start=strstr(buffer,"/**"))!=NULL  && ! block_comment) {
+            (*comment_start)='\0';
+            block_comment=true;
+        } else if(strstr(buffer,"*/")!=NULL && block_comment) {
+            block_comment=false;
+            buffer[0]='\0'; 
+        }
+
+        if(strstr(buffer,"{")!=NULL && strstr(buffer,"}")==NULL){
+            if(block.data==NULL) block.data = (char *)malloc(sizeof(char)*blockSz);
+            do {
+                for(size_t i=0; i<strlen(buffer); i++) {
+                    if(buffer[i]=='{') braces++;
+                    if(buffer[i]=='}') braces--;
+                    if(buffer[i]=='\n' || buffer[i]=='\r')
+                        buffer[i]=' ';
+                }
+                block_append(&block,buffer);
+                fgets(buffer,readBufSz,script);
+            } while(braces);
+            js->execute(block.data);
+            block_clear(&block);
+        }
+
+        if(strstr(buffer,"[")!=NULL && strstr(buffer,"]")==NULL){
+            if(block.data==NULL) block.data = (char *)malloc(sizeof(char)*blockSz);
+            do {
+                for(size_t i=0; i<strlen(buffer); i++) {
+                    if(buffer[i]=='{') braces++;
+                    if(buffer[i]=='}') braces--;
+                    if(buffer[i]=='\n' || buffer[i]=='\r')
+                        buffer[i]=' ';
+                }
+                block_append(&block,buffer);
+                fgets(buffer,readBufSz,script);
+            } while(braces);
+            js->execute(block.data);
+            block_clear(&block);
+        }
+
+        if(!block_comment)
+            { js->execute(buffer); }
+    }
+  } catch (CScriptException *e) {
+        printf("Error Reading Script: %s\n", e->text.c_str());
+  }
 }
