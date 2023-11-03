@@ -1234,5 +1234,5 @@ function onClose() {
 }
 
 function setProperty(property, value) {
-  properties[property].current = value;
+  p1operties[property].current = value;
 }

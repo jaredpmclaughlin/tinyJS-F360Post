@@ -1,3 +1,10 @@
 .vscode/
 build/
 build.*/
+*.o
+Script
+run_tests
+.gitignore
+*.nc
+*.swp
+out

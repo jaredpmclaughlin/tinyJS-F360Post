@@ -44,7 +44,7 @@ const size_t readBufSz = 2048;
 
 void js_print(CScriptVar *v, void *userdata);
 void js_dump(CScriptVar *v, void *userdata);
-void eval_script(char *filename);
+void eval_script(CTinyJS *js, char *filename);
 
 int main(int argc, char **argv)
 {
@@ -69,7 +69,7 @@ int main(int argc, char **argv)
     printf("ERROR: %s\n", e->text.c_str());
   }
 
-  eval_script("test_data/rs274.cps");
+  eval_script(js,"test_data/rs274.cps");
 
   /* Execute out bit of code - we could call 'evaluate' here if
      we wanted something returned */
@@ -120,26 +120,39 @@ void block_append(struct block_s* block, char* string){
     if(block==NULL || string==NULL) return;
 
     size_t length = strlen(string);
-    while(block->capacity < (block->size+length)) 
-        block->capacity+=block->capacity;
 
-    realloc(block->data, block->capacity);
-    memcpy(&(block->data[block->size-1]),string,length+1);
-    block->size+=length+1;
+    if(block->capacity==0){
+        block->capacity=length+1;
+        block->data= (char *) malloc(sizeof(char)*block->capacity);
+        memcpy(block->data,string,length+1);
+        block->size=block->capacity;
+    }else if (block->capacity < (block->size+length)) {
+        while(block->capacity < (block->size+length)) 
+          block->capacity+=block->capacity;
+        block->data=(char *)realloc(block->data, sizeof(char)*((block->capacity)));
+        memcpy(&(block->data[block->size-1]),string,length);
+        block->size+=length;
+    } else {
+        if(block->size) memcpy(&(block->data[block->size-1]),string,length+1);
+        else memcpy(&(block->data),string,length+1);
+        block->size+=length;
+    }
 }
 
 void block_clear(struct block_s* block) {
-    block->size=0;
+    printf("Block contents:\n%s\n", block->data);
+    printf("Block cleared.\n");
+    block->size=1;
     block->data[0]='\0';
 }
 
-void eval_script(char* filename) {
+void eval_script(CTinyJS* js,char* filename) {
 
   FILE *script = fopen(filename,"r");
   if(script==NULL) 
     throw new CScriptException(strerror(errno));
 
-  CTinyJS *js = new CTinyJS();
+  printf("Evaluating script.\n");
 
   size_t blockSz=readBufSz*2;
   char buffer[readBufSz];
@@ -181,7 +194,6 @@ void eval_script(char* filename) {
         }
 
         if(strstr(buffer,"{")!=NULL && strstr(buffer,"}")==NULL){
-            if(block.data==NULL) block.data = (char *)malloc(sizeof(char)*blockSz);
             do {
                 for(size_t i=0; i<strlen(buffer); i++) {
                     if(buffer[i]=='{') braces++;
@@ -197,11 +209,10 @@ void eval_script(char* filename) {
         }
 
         if(strstr(buffer,"[")!=NULL && strstr(buffer,"]")==NULL){
-            if(block.data==NULL) block.data = (char *)malloc(sizeof(char)*blockSz);
             do {
                 for(size_t i=0; i<strlen(buffer); i++) {
-                    if(buffer[i]=='{') braces++;
-                    if(buffer[i]=='}') braces--;
+                    if(buffer[i]=='[') braces++;
+                    if(buffer[i]==']') braces--;
                     if(buffer[i]=='\n' || buffer[i]=='\r')
                         buffer[i]=' ';
                 }
@@ -217,5 +228,7 @@ void eval_script(char* filename) {
     }
   } catch (CScriptException *e) {
         printf("Error Reading Script: %s\n", e->text.c_str());
+        printf("Current buffer: %s\n", buffer);
+        printf("Current block: %s\n", block.data);
   }
 }

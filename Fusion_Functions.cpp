@@ -55,6 +55,7 @@ void fs_createModal(CScriptVar* c, void* userdata) {
 }
     
 void registerFusionFunctions(CTinyJS* tinyJS) {
+    printf("Registering Fusion Functions\n");
     tinyJS->execute("var MM=\"MM\";");
     tinyJS->execute("var IN=\"IN\";");
     tinyJS->execute("function toRad(a){ return Math.toRadians(a); };");
