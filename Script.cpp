@@ -111,8 +111,9 @@ void js_dump(CScriptVar *v, void *userdata) {
 }
 
 struct block_s {
+    size_t last_cap=0;
     size_t capacity=0;
-    size_t size=0;
+    size_t size=0; 
     char* data=NULL; 
 };
 
@@ -120,30 +121,34 @@ void block_append(struct block_s* block, char* string){
     if(block==NULL || string==NULL) return;
 
     size_t length = strlen(string);
+	block->last_cap=block->capacity;
 
-    if(block->capacity==0){
+    if(block->capacity == 0) {
         block->capacity=length+1;
         block->data= (char *) malloc(sizeof(char)*block->capacity);
-        memcpy(block->data,string,length+1);
-        block->size=block->capacity;
-    }else if (block->capacity < (block->size+length)) {
-        while(block->capacity < (block->size+length)) 
-          block->capacity+=block->capacity;
-        block->data=(char *)realloc(block->data, sizeof(char)*((block->capacity)));
-        memcpy(&(block->data[block->size-1]),string,length);
-        block->size+=length;
-    } else {
-        if(block->size) memcpy(&(block->data[block->size-1]),string,length+1);
-        else memcpy(&(block->data),string,length+1);
-        block->size+=length;
     }
+
+    while(block->capacity < (block->size+length))
+	block->capacity+=block->capacity+1;
+
+    if(block->last_cap < block->capacity) {
+        block->data=(char *)realloc(block->data, ((block->capacity)));
+    }
+
+	if(block->size)
+    	memcpy(&(block->data[block->size-1]),string,length);
+	else
+    	memcpy(&(block->data[0]),string,length);
+		
+	block->size+=length;
+
 }
 
 void block_clear(struct block_s* block) {
-    printf("Block contents:\n%s\n", block->data);
-    printf("Block cleared.\n");
-    block->size=1;
-    block->data[0]='\0';
+//    printf("Block contents:\n%s\n", block->data);
+//    printf("Block cleared.\n");
+	memset(block->data,'\0',block->size);
+	block->size=0;
 }
 
 void eval_script(CTinyJS* js,char* filename) {
@@ -206,6 +211,7 @@ void eval_script(CTinyJS* js,char* filename) {
             } while(braces);
             js->execute(block.data);
             block_clear(&block);
+            buffer[0]='\0'; 
         }
 
         if(strstr(buffer,"[")!=NULL && strstr(buffer,"]")==NULL){
@@ -221,6 +227,7 @@ void eval_script(CTinyJS* js,char* filename) {
             } while(braces);
             js->execute(block.data);
             block_clear(&block);
+            buffer[0]='\0'; 
         }
 
         if(!block_comment)
