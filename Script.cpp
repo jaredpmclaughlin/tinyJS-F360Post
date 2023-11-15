@@ -231,7 +231,7 @@ void eval_script(CTinyJS* js,char* filename) {
         if(!block_comment)
             { js->execute(buffer); }
     }
-    free(block);
+    free((void *)block.data);
   } catch (CScriptException *e) {
         printf("Error Reading Script: %s\n", e->text.c_str());
         printf("Current buffer: %s\n", buffer);
