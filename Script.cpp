@@ -145,8 +145,6 @@ void block_append(struct block_s* block, char* string){
 }
 
 void block_clear(struct block_s* block) {
-//    printf("Block contents:\n%s\n", block->data);
-//    printf("Block cleared.\n");
 	memset(block->data,'\0',block->size);
 	block->size=0;
 }
@@ -233,6 +231,7 @@ void eval_script(CTinyJS* js,char* filename) {
         if(!block_comment)
             { js->execute(buffer); }
     }
+    free(block);
   } catch (CScriptException *e) {
         printf("Error Reading Script: %s\n", e->text.c_str());
         printf("Current buffer: %s\n", buffer);
