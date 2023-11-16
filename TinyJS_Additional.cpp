@@ -84,7 +84,6 @@ void js_writeln(CScriptVar* c, void* userdata) {
 // Some functions that are built-in methods.
 
 void js_toExponential(CScriptVar *c, void* userdata) {
-    CScriptVar* obj = c->getParameter("this");
     int precision = c->getParameter("digits")->getInt();
     char string[50];
     char format[10];
@@ -94,19 +93,36 @@ void js_toExponential(CScriptVar *c, void* userdata) {
 	dbl=c->getParameter("this")->getDouble();
 	sprintf(format, "%s%ie", "%.", precision);
 	sprintf(string, format, dbl);
-	//printf("%s %s\n",format,string);
     }
     if (c->getParameter("this")->isDouble()) {
 	dbl=c->getParameter("this")->getDouble();
 	sprintf(format, "%s%ie", "%.", precision);
 	sprintf(string, format, dbl);
-	//printf("%s %s\n",format,string);
     }
     c->getReturnVar()->setString(string); 
 }
 
+void js_toFixed(CScriptVar *c, void* userdata) {
+    int precision = c->getParameter("digits")->getInt();
+    char string[50];
+    char format[10];
+    double dbl=0;
+
+    if (c->getParameter("this")->isInt()) {
+	dbl=c->getParameter("this")->getDouble();
+	sprintf(format, "%s%if", "%.", precision);
+	sprintf(string, format, dbl);
+    }
+    if (c->getParameter("this")->isDouble()) {
+	dbl=c->getParameter("this")->getDouble();
+	sprintf(format, "%s%if", "%.", precision);
+	sprintf(string, format, dbl);
+    }
+    c->getReturnVar()->setString(string); 
+}
     
 void registerAdditionalFunctions(CTinyJS* tinyJS) {
 	tinyJS->addNative("function writeln(text)", js_writeln, 0);
 	tinyJS->addNative("function Object.toExponential(digits)", js_toExponential,0);
+	tinyJS->addNative("function Object.toFixed(digits)", js_toFixed,0);
 }
