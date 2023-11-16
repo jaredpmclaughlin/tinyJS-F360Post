@@ -80,7 +80,33 @@ void js_writeln(CScriptVar* c, void* userdata) {
     if(write(fd,string,len+1)<0) 
         throw new CScriptException("Error writing to file."); 
 }
+
+// Some functions that are built-in methods.
+
+void js_toExponential(CScriptVar *c, void* userdata) {
+    CScriptVar* obj = c->getParameter("this");
+    int precision = c->getParameter("digits")->getInt();
+    char string[50];
+    char format[10];
+    double dbl=0;
+
+    if (c->getParameter("this")->isInt()) {
+	dbl=c->getParameter("this")->getDouble();
+	sprintf(format, "%s%ie", "%.", precision);
+	sprintf(string, format, dbl);
+	//printf("%s %s\n",format,string);
+    }
+    if (c->getParameter("this")->isDouble()) {
+	dbl=c->getParameter("this")->getDouble();
+	sprintf(format, "%s%ie", "%.", precision);
+	sprintf(string, format, dbl);
+	//printf("%s %s\n",format,string);
+    }
+    c->getReturnVar()->setString(string); 
+}
+
     
 void registerAdditionalFunctions(CTinyJS* tinyJS) {
 	tinyJS->addNative("function writeln(text)", js_writeln, 0);
+	tinyJS->addNative("function Object.toExponential(digits)", js_toExponential,0);
 }
